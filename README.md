@@ -1,2 +1,1 @@
-# activiti-demo
-审批流程小样
+activiti-demo
