@@ -7,7 +7,7 @@ import com.example.demo.service.IActivitiFlowService;
 import com.example.demo.utils.SnowflakeIdWorker;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import jdk.nashorn.internal.runtime.regexp.joni.constants.NodeType;
+
 import org.activiti.bpmn.BpmnAutoLayout;
 import org.activiti.bpmn.model.Process;
 import org.activiti.bpmn.model.*;
@@ -32,7 +32,7 @@ import java.io.File;
 import java.io.InputStream;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
+
 
 import static java.util.stream.Collectors.groupingBy;
 
@@ -128,7 +128,8 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
     private String createActivitiProcess(ActivitiFlowRequestDto activitiFlowRequestDto,
                                          List<ActivitiFlowStepDto> stepDtoList) {
         ProcessEngine processEngine = ProcessEngines.getDefaultProcessEngine();
-
+        //处理节点的父类节点
+        stepDtoList = makeNodeParentType(stepDtoList);
 
         BpmnModel model = new BpmnModel();
         Process process = new Process();
@@ -562,7 +563,8 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
                         process.addFlowElement(createSequenceFlow("parallelGateway-fork-" + stepNumber + "-" + (stepNumber - 1),
                             "userTask-" + stepNumber + "-" + i + "-" + u,
                             "并行网关-分支到会签用户" + stepNumber + "-" + i + "-" + u, ""));
-                        logger.info("连线form:{},to:{}", "userTask-" + stepNumber + "-" + i + "-" + u, "parallelGateway-" +
+                        logger.info("连线form:{},to:{}", "userTask-" + stepNumber + "-" + i + "-" + u, "parallelGateway" +
+                            "-" +
                             "-join-" + stepNumber + "-" + (stepNumber + 1));
                         process.addFlowElement(createSequenceFlow("userTask-" + stepNumber + "-" + i + "-" + u,
                             "parallelGateway-join-" + stepNumber + "-" + (stepNumber + 1),
@@ -576,7 +578,8 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
                         "userTask-" + stepNumber + "-" + i, "并行网关-分支到会签用户" + stepNumber + "-" + i, ""));
                     logger.info("连线form:{},to:{}", "userTask-" + stepNumber + "-" + i,
                         "parallelGateway-join-" + stepNumber + "-" + (stepNumber + 1));
-                    process.addFlowElement(createSequenceFlow("userTask-" + stepNumber + "-" + i, "parallelGateway-join-"
+                    process.addFlowElement(createSequenceFlow("userTask-" + stepNumber + "-" + i, "parallelGateway" +
+                        "-join-"
                         + stepNumber + "-" + (stepNumber + 1), "会签用户到并行网关-汇聚" + stepNumber + "-" + i, ""));
                 }
             }
@@ -630,4 +633,19 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
         });
     }
 
+    /**
+     * 处理节点的父类节点.
+     */
+    public List<ActivitiFlowStepDto> makeNodeParentType(List<ActivitiFlowStepDto> stepDtoList) {
+        //按照步骤顺序进行排序
+        List<ActivitiFlowStepDto> orderStepDtoList =
+            Optional.ofNullable(stepDtoList).orElse(Lists.newArrayList()).stream().filter(Objects::nonNull)
+            .sorted(Comparator.comparing(ActivitiFlowStepDto::getSerialNumber)).collect(Collectors.toList());
+        for (int i = 1, j = orderStepDtoList.size(); i < j; i++) {
+            ActivitiFlowStepDto activitiFlowStepDto = orderStepDtoList.get(i);
+            ActivitiFlowStepDto parentActivitiFlowStepDto = orderStepDtoList.get(i - 1);
+            activitiFlowStepDto.setParentNodeType(parentActivitiFlowStepDto.getNodeType());
+        }
+        return orderStepDtoList;
+    }
 }
