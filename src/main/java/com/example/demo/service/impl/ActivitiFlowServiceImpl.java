@@ -352,14 +352,17 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
                 .filter(Objects::nonNull)
                 .collect(groupingBy(ActivitiFlowStepDto::getNodeType,
                     groupingBy(ActivitiFlowStepDto::getSerialNumber)));
+        //获取总的步数
+        Integer max =
+            Optional.ofNullable(stepList).orElse(Lists.newArrayList()).stream().filter(Objects::nonNull).mapToInt(ActivitiFlowStepDto::getSerialNumber).max().getAsInt();
+
         Optional.ofNullable(stepGroupMap).orElse(Maps.newConcurrentMap()).entrySet().forEach(entry -> {
-            Map<Integer, List<ActivitiFlowStepDto>> stepMap = entry.getValue();
             if (NODE_TYPE_SING.equals(entry.getKey())) {
                 //会签类型
-                buildSignSequenceFlow(process,entry.getValue(),stepList.size());
+                buildSignSequenceFlow(process, entry.getValue(), max);
             } else {
                 //普通类型
-                buildNormalSequenceFlow(process,entry.getValue(),stepList.size());
+                buildNormalSequenceFlow(process, entry.getValue(), max);
             }
         });
 
@@ -378,7 +381,8 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
 //                    //审核节点或者并行网关-汇聚到并行网关-分支
 //                    //判断上一个节点是否是会签
 //                    if (NODE_TYPE_SING.equals(stepList.get(y - 1).getNodeType())) {
-//                        process.addFlowElement(createSequenceFlow("parallelGateway-join" + (y - 1), "parallelGateway" +
+//                        process.addFlowElement(createSequenceFlow("parallelGateway-join" + (y - 1),
+//                        "parallelGateway" +
 //                            "-fork" + y, "并行网关-汇聚到并行网关-分支" + y, ""));
 //                    } else {
 //                        process.addFlowElement(createSequenceFlow("task" + (y - 1), "parallelGateway-fork" + y,
@@ -389,9 +393,11 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
 //                if (NODE_ACTIVITI_TYPE_ROLE.equals(step.getNodeActionType())) {
 //                    List<String> userList = new ArrayList<>();
 //                    for (int u = 0; u < userList.size(); u++) {
-//                        process.addFlowElement(createSequenceFlow("parallelGateway-fork" + y, "userTask" + y + u + "r",
+//                        process.addFlowElement(createSequenceFlow("parallelGateway-fork" + y, "userTask" + y + u +
+//                        "r",
 //                            "并行网关-分支到会签用户" + y + u + "r", ""));
-//                        process.addFlowElement(createSequenceFlow("userTask" + y + u + "r", "parallelGateway-join" + y,
+//                        process.addFlowElement(createSequenceFlow("userTask" + y + u + "r", "parallelGateway-join"
+//                        + y,
 //                            "会签用户到并行网关-汇聚", ""));
 //                    }
 //                } else {
@@ -432,7 +438,8 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
 //                        "=='true'}"));
 //                }
 //                //审核节点到回退节点
-//                process.addFlowElement(createSequenceFlow("task" + y, "repulse" + y, "审核不通过-打回" + y, "${flag=='false" +
+//                process.addFlowElement(createSequenceFlow("task" + y, "repulse" + y, "审核不通过-打回" + y,
+//                "${flag=='false" +
 //                    "'}"));
 //                process.addFlowElement(createSequenceFlow("repulse" + y, "task" + y, "回退节点到审核节点" + y, ""));
 //            }
@@ -452,9 +459,9 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
             Integer stepNumber = entry.getKey();
             List<ActivitiFlowStepDto> activitiFlowStepDtoList = entry.getValue();
             Integer beforeNumber = stepNumber - 1;
-            logger.info("增加并行网关分支");
+            logger.info("增加并行网关分支:{}", "parallelGateway-fork-" + stepNumber + "-" + beforeNumber);
             //增加并行网关-分支
-            process.addFlowElement(createParallelGateway("parallelGateWay-fork" + stepNumber + "-" + beforeNumber,
+            process.addFlowElement(createParallelGateway("parallelGateway-fork-" + stepNumber + "-" + beforeNumber,
                 "并行网关分支" + stepNumber + "-" + beforeNumber));
             //增加分支任务节点
             int size = activitiFlowStepDtoList.size();
@@ -464,21 +471,21 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
                     //配置的是角色
                     List<String> userList = Lists.newArrayList();
                     for (int u = 0; u < userList.size(); u++) {
-                        logger.info("根据角色增加用户审核节点");
-                        process.addFlowElement(createUserTask("userTask" + stepNumber + "-" + i + "-" + u,
+                        logger.info("根据角色增加用户审核节点:{}", "userTask-" + stepNumber + "-" + i + "-" + u);
+                        process.addFlowElement(createUserTask("userTask-" + stepNumber + "-" + i + "-" + u,
                             "并行网关分支用户审核节点" + stepNumber + "-" + i + "u", userList.get(u)));
                     }
                 } else {
                     //配置的是具体的用户
-                    logger.info("增加用户审核节点");
-                    process.addFlowElement(createUserTask("userTask" + stepNumber + "-" + i,
+                    logger.info("增加用户审核节点:{}", "userTask-" + stepNumber + "-" + i);
+                    process.addFlowElement(createUserTask("userTask-" + stepNumber + "-" + i,
                         "并行网关分支用户审核节点" + stepNumber + "-" + i, stepDto.getRoleOrUserId()));
                 }
             }
             //增加并行网关-汇聚
-            logger.info("增加并行网关汇聚");
             Integer afterNumber = stepNumber + 1;
-            process.addFlowElement(createParallelGateway("parallelGateway-join" + +stepNumber + "-" + afterNumber,
+            logger.info("增加并行网关汇聚:{}", "parallelGateway-join-" + +stepNumber + "-" + afterNumber);
+            process.addFlowElement(createParallelGateway("parallelGateway-join-" + +stepNumber + "-" + afterNumber,
                 "并行网关汇聚" + stepNumber + "-" + afterNumber));
         });
     }
@@ -498,12 +505,13 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
             if (NODE_ACTIVITI_TYPE_ROLE.equals(activitiFlowStepDto.getNodeActionType())) {
                 List<String> userList = Lists.newArrayList();
                 for (int u = 0; u < userList.size(); u++) {
-                    logger.info("根据角色增加用户审批节点");
-                    process.addFlowElement(createUserTask("userTask" + stepNumber + "-0-" + u,
+                    logger.info("根据角色增加用户审批节点:{}", "userTask-" + stepNumber + "-0-" + u);
+                    process.addFlowElement(createUserTask("userTask-" + stepNumber + "-0-" + u,
                         "用户审核节点" + stepNumber + "-0-" + u, userList.get(u)));
                 }
             } else {
-                process.addFlowElement(createUserTask("userTask" + stepNumber + "-0", "用户审核节点" + stepNumber + "-0",
+                logger.info("增加用户审批节点:{}", "userTask-" + stepNumber + "-0");
+                process.addFlowElement(createUserTask("userTask-" + stepNumber + "-0", "用户审核节点" + stepNumber + "-0",
                     activitiFlowStepDto.getRoleOrUserId()));
             }
         });
@@ -519,19 +527,26 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
             List<ActivitiFlowStepDto> stepDtoList = entry.getValue();
             if (stepNumber == 1) {
                 //是第一步
+                logger.info("连线form:{},to:{}", "startEvent",
+                    "parallelGateway-fork-" + stepNumber + "-" + (stepNumber - 1));
                 process.addFlowElement(createSequenceFlow("startEvent",
-                    "parallelGateway-fork" + stepNumber + "-" + (stepNumber - 1), "开始节点-并行网关-分支" + stepNumber, ""));
+                    "parallelGateway-fork-" + stepNumber + "-" + (stepNumber - 1), "开始节点-并行网关-分支" + stepNumber, ""));
             } else {
                 //不是第一步
                 ActivitiFlowStepDto activitiFlowStepDto = stepDtoList.get(0);
                 if (NODE_TYPE_SING.equals(activitiFlowStepDto.getParentNodeType())) {
                     //上一步是会签节点
-                    process.addFlowElement(createSequenceFlow("parallelGateway-join" + (stepNumber - 1) + "-" + stepNumber,
-                        "parallelGateway-fork" + stepNumber + "-" + (stepNumber - 1), "并行网关-汇聚到并行网关-分支" + stepNumber, ""));
+                    logger.info("连线form:{},to:{}", "parallelGateway-join-" + (stepNumber - 1) + "-" + stepNumber,
+                        "parallelGateway-fork-" + stepNumber + "-" + (stepNumber - 1));
+                    process.addFlowElement(createSequenceFlow("parallelGateway-join-" + (stepNumber - 1) + "-" + stepNumber,
+                        "parallelGateway-fork-" + stepNumber + "-" + (stepNumber - 1), "并行网关-汇聚到并行网关-分支" + stepNumber,
+                        ""));
                 } else {
                     //不是会签节点
-                    process.addFlowElement(createSequenceFlow("userTask" + (stepNumber - 1) + "-0",
-                        "parallelGateway-fork" + stepNumber + "-" + (stepNumber - 1), "上一审核节点到并行网关-分支" + stepNumber,
+                    logger.info("连线form:{},to:{}", "userTask-" + (stepNumber - 1) + "-0",
+                        "parallelGateway-fork-" + stepNumber + "-" + (stepNumber - 1));
+                    process.addFlowElement(createSequenceFlow("userTask-" + (stepNumber - 1) + "-0",
+                        "parallelGateway-fork-" + stepNumber + "-" + (stepNumber - 1), "上一审核节点到并行网关-分支" + stepNumber,
                         ""));
                 }
             }
@@ -542,23 +557,34 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
                     //角色的执行人
                     List<String> userList = Lists.newArrayList();
                     for (int u = 0; u < userList.size(); u++) {
-                        process.addFlowElement(createSequenceFlow("parallelGateway-fork" + stepNumber + "-" + (stepNumber - 1),
-                            "userTask" + stepNumber + "-" + i + "-" + u, "并行网关-分支到会签用户" + stepNumber + "-" + i + "-" + u, ""));
-                        process.addFlowElement(createSequenceFlow("userTask" + stepNumber + "-" + i + "-" + u,
-                            "parallelGateway-join" + stepNumber + "-" + (stepNumber + 1),
+                        logger.info("连线form:{},to:{}", "parallelGateway-fork-" + stepNumber + "-" + (stepNumber - 1),
+                            "userTask" + stepNumber + "-" + i + "-" + u);
+                        process.addFlowElement(createSequenceFlow("parallelGateway-fork-" + stepNumber + "-" + (stepNumber - 1),
+                            "userTask-" + stepNumber + "-" + i + "-" + u,
+                            "并行网关-分支到会签用户" + stepNumber + "-" + i + "-" + u, ""));
+                        logger.info("连线form:{},to:{}", "userTask-" + stepNumber + "-" + i + "-" + u, "parallelGateway-" +
+                            "-join-" + stepNumber + "-" + (stepNumber + 1));
+                        process.addFlowElement(createSequenceFlow("userTask-" + stepNumber + "-" + i + "-" + u,
+                            "parallelGateway-join-" + stepNumber + "-" + (stepNumber + 1),
                             "会签用户到并行网关-汇聚" + stepNumber + "-" + i + "-" + u, ""));
                     }
                 } else {
                     //普通的执行人
-                    process.addFlowElement(createSequenceFlow("parallelGateway-fork" + stepNumber + "-" + (stepNumber - 1),
-                        "userTask" + stepNumber + "-" + i, "并行网关-分支到会签用户" + stepNumber + "-" + i, ""));
-                    process.addFlowElement(createSequenceFlow("userTask" + stepNumber + "-" + i, "parallelGateway" +
-                        "-join" + stepNumber + "-" + (stepNumber + 1), "会签用户到并行网关-汇聚" + stepNumber + "-" + i, ""));
+                    logger.info("连线form:{},to:{}", "parallelGateway-fork-" + stepNumber + "-" + (stepNumber - 1),
+                        "userTask-" + stepNumber + "-" + i);
+                    process.addFlowElement(createSequenceFlow("parallelGateway-fork-" + stepNumber + "-" + (stepNumber - 1),
+                        "userTask-" + stepNumber + "-" + i, "并行网关-分支到会签用户" + stepNumber + "-" + i, ""));
+                    logger.info("连线form:{},to:{}", "userTask-" + stepNumber + "-" + i,
+                        "parallelGateway-join-" + stepNumber + "-" + (stepNumber + 1));
+                    process.addFlowElement(createSequenceFlow("userTask-" + stepNumber + "-" + i, "parallelGateway-join-"
+                        + stepNumber + "-" + (stepNumber + 1), "会签用户到并行网关-汇聚" + stepNumber + "-" + i, ""));
                 }
             }
             //判断是不是最后一步
             if (stepNumber.equals(totalStepNumber)) {
-                process.addFlowElement(createSequenceFlow("parallelGateway-join" + stepNumber + "-" + (stepNumber + 1),
+                logger.info("连线form:{},to:{}", "parallelGateway-join-" + stepNumber + "-" + (stepNumber + 1),
+                    "endEvent");
+                process.addFlowElement(createSequenceFlow("parallelGateway-join-" + stepNumber + "-" + (stepNumber + 1),
                     "endEvent", "并行网关-汇聚到结束节点", ""));
             }
         });
@@ -575,24 +601,30 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
 
             if (stepNumber == 1) {
                 //是第一步
+                logger.info("连线form:{},to:{}", "startEvent", "userTask-" + stepNumber + "-0");
                 process.addFlowElement(createSequenceFlow("startEvent",
-                    "userTask" + stepNumber + "-0", "开始节点-审核节点" + stepNumber + "-0", ""));
+                    "userTask-" + stepNumber + "-0", "开始节点-审核节点" + stepNumber + "-0", ""));
             } else {
                 //不是第一步
                 ActivitiFlowStepDto activitiFlowStepDto = stepDtoList.get(0);
                 if (NODE_TYPE_SING.equals(activitiFlowStepDto.getParentNodeType())) {
                     //上一步是会签节点
-                    process.addFlowElement(createSequenceFlow("parallelGateway-join" + (stepNumber - 1) + "-" + stepNumber,
-                        "userTask" + stepNumber + "-0", "并行网关-汇聚到并行网关-分支" + stepNumber + "-0", ""));
+                    logger.info("连线form:{},to:{}", "parallelGateway-join-" + (stepNumber - 1) + "-" + stepNumber,
+                        "userTask-" + stepNumber + "-0");
+                    process.addFlowElement(createSequenceFlow("parallelGateway-join-" + (stepNumber - 1) + "-" + stepNumber,
+                        "userTask-" + stepNumber + "-0", "并行网关-汇聚到并行网关-分支" + stepNumber + "-0", ""));
                 } else {
                     //不是会签节点
-                    process.addFlowElement(createSequenceFlow("userTask" + (stepNumber - 1) + "-0",
-                        "userTask" + stepNumber + "-0", "上一审核节点到并行网关-分支" + stepNumber + "-0", ""));
+                    logger.info("连线form:{},to:{}", "userTask-" + (stepNumber - 1) + "-0", "userTask-" + stepNumber +
+                        "-0");
+                    process.addFlowElement(createSequenceFlow("userTask-" + (stepNumber - 1) + "-0",
+                        "userTask-" + stepNumber + "-0", "上一审核节点到并行网关-分支" + stepNumber + "-0", ""));
                 }
             }
             //判断是不是最后一步
             if (stepNumber.equals(totalStepNumber)) {
-                process.addFlowElement(createSequenceFlow("userTask" + stepNumber + "-0", "endEvent", "并行网关-汇聚到结束节点",
+                logger.info("连线form:{},to:{}", "userTask-" + stepNumber + "-0", "endEvent");
+                process.addFlowElement(createSequenceFlow("userTask-" + stepNumber + "-0", "endEvent", "并行网关-汇聚到结束节点",
                     ""));
             }
         });
