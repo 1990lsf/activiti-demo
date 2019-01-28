@@ -2,10 +2,7 @@ package com.example.demo.service.impl;
 
 
 import com.alibaba.fastjson.JSON;
-import com.example.demo.dto.ActivitiFlowRequestDto;
-import com.example.demo.dto.ActivitiFlowStepDto;
-import com.example.demo.dto.QueryTaskRequestDto;
-import com.example.demo.dto.StartTaskRequestDto;
+import com.example.demo.dto.*;
 import com.example.demo.service.IActivitiFlowService;
 import com.example.demo.utils.SnowflakeIdWorker;
 import com.google.common.collect.Lists;
@@ -14,9 +11,11 @@ import com.google.common.collect.Maps;
 import org.activiti.bpmn.BpmnAutoLayout;
 import org.activiti.bpmn.model.Process;
 import org.activiti.bpmn.model.*;
-import org.activiti.engine.IdentityService;
 import org.activiti.engine.ProcessEngine;
 import org.activiti.engine.ProcessEngines;
+import org.activiti.engine.TaskService;
+import org.activiti.engine.history.HistoricProcessInstance;
+import org.activiti.engine.impl.TaskServiceImpl;
 import org.activiti.engine.repository.Deployment;
 import org.activiti.engine.runtime.ProcessInstance;
 import org.activiti.engine.task.Task;
@@ -29,7 +28,6 @@ import org.apache.commons.lang3.StringUtils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -112,8 +110,7 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
     /**
      * Query activiti task.
      *
-     * @param processId the process id
-     * @param orderId   the order id
+     * @param queryTaskRequestDto the queryTaskRequestDto
      */
     @Override
     public List<PerTask> queryActivitiTask(QueryTaskRequestDto queryTaskRequestDto) {
@@ -133,7 +130,34 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
         }).collect(Collectors.toList());
     }
 
+    /**
+     * 执行任务.
+     *
+     * @param exeTaskRequestDto
+     */
+    @Override
+    public void exeActivitiTask(ExeTaskRequestDto exeTaskRequestDto) {
+        //根据人,进行任务执行。
+        logger.info("执行任:{}", JSON.toJSONString(exeTaskRequestDto));
+        ProcessEngine processEngine = ProcessEngines.getDefaultProcessEngine();
+        TaskService taskService = processEngine.getTaskService();
+        Map<String,Object> resultMap = Maps.newHashMap();
+        resultMap.put("result",exeTaskRequestDto.getResultCode());
+        resultMap.put("context",exeTaskRequestDto.getContext());
+        taskService.complete(exeTaskRequestDto.getTaskId(),resultMap);
 
+    }
+
+    private void stopRunProcessInstance(String taskId,String orderId){
+        if(StringUtils.isNotEmpty(orderId)){
+            ProcessEngine processEngine =ProcessEngines.getDefaultProcessEngine();
+            Task task = processEngine.getTaskService().createTaskQuery().processInstanceBusinessKey(orderId).singleResult();
+            if(!Objects.isNull(task)){
+                TaskServiceImpl taskServiceImpl = (TaskServiceImpl) processEngine.getTaskService();
+
+            }
+        }
+    }
     private String createActivitiProcess(ActivitiFlowRequestDto activitiFlowRequestDto,
                                          List<ActivitiFlowStepDto> stepDtoList) {
         ProcessEngine processEngine = ProcessEngines.getDefaultProcessEngine();
@@ -187,11 +211,10 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
      */
     protected UserTask createUserTask(String id, String name, String userPkno) {
         List<String> candidateUsers = new ArrayList<String>();
-        candidateUsers.add(userPkno);
         UserTask userTask = new UserTask();
         userTask.setName(name);
         userTask.setId(id);
-
+        candidateUsers.add(userPkno);
         userTask.setCandidateUsers(candidateUsers);
         return userTask;
     }
@@ -604,6 +627,10 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
 
     /**
      * 构建普通节点的连线.
+     *
+     * @param process         the process
+     * @param stepMap         the step map
+     * @param totalStepNumber the total step number
      */
     public void buildNormalSequenceFlow(Process process, Map<Integer, List<ActivitiFlowStepDto>> stepMap,
                                         Integer totalStepNumber) {
@@ -644,6 +671,9 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
 
     /**
      * 处理节点的父类节点.
+     *
+     * @param stepDtoList the step dto list
+     * @return the list
      */
     public List<ActivitiFlowStepDto> makeNodeParentType(List<ActivitiFlowStepDto> stepDtoList) {
         //按照步骤顺序进行排序

@@ -1,4 +1,4 @@
-package com.example.demo.service.impl;
+package com.example.demo.dto;
 
 
 import java.util.Date;

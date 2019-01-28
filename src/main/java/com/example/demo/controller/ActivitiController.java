@@ -2,13 +2,13 @@ package com.example.demo.controller;
 
 import com.alibaba.fastjson.JSON;
 import com.example.demo.dto.ActivitiFlowRequestDto;
+import com.example.demo.dto.ExeTaskRequestDto;
 import com.example.demo.dto.QueryTaskRequestDto;
 import com.example.demo.dto.StartTaskRequestDto;
 import com.example.demo.service.IActivitiFlowService;
-import com.example.demo.service.impl.PerTask;
+import com.example.demo.dto.PerTask;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import org.activiti.engine.task.Task;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,4 +67,14 @@ public class ActivitiController {
         return ResponseEntity.ok(iActivitiFlowService.queryActivitiTask(queryTaskRequestDto));
     }
 
+    /**
+     * 执行流程任务.
+     */
+    @PostMapping(value = "/activiti/order/run/task")
+    @ApiOperation(value = "执行任务", notes = "执行任务")
+    public ResponseEntity exeActivitiTask(ExeTaskRequestDto exeTaskRequestDto) {
+        logger.info("执行任务:{},执行人:{}", exeTaskRequestDto.getTaskId(), exeTaskRequestDto.getUserId());
+        iActivitiFlowService.exeActivitiTask(exeTaskRequestDto);
+        return new ResponseEntity(HttpStatus.OK);
+    }
 }

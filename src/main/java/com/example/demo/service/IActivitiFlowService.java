@@ -1,10 +1,10 @@
 package com.example.demo.service;
 
 import com.example.demo.dto.ActivitiFlowRequestDto;
+import com.example.demo.dto.ExeTaskRequestDto;
 import com.example.demo.dto.QueryTaskRequestDto;
 import com.example.demo.dto.StartTaskRequestDto;
-import com.example.demo.service.impl.PerTask;
-import org.activiti.engine.task.Task;
+import com.example.demo.dto.PerTask;
 
 import java.util.List;
 
@@ -35,4 +35,10 @@ public interface IActivitiFlowService {
       * @return the list
       */
      List<PerTask> queryActivitiTask(QueryTaskRequestDto queryTaskRequestDto);
+
+     /**
+      * 执行任务.
+      * @param exeTaskRequestDto
+      */
+    void exeActivitiTask(ExeTaskRequestDto exeTaskRequestDto);
 }
