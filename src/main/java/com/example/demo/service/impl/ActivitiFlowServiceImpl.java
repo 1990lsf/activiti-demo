@@ -1,8 +1,8 @@
 package com.example.demo.service.impl;
 
 
-import com.example.demo.dto.ActivitiFlowRequestDto;
-import com.example.demo.dto.ActivitiFlowStepDto;
+import com.alibaba.fastjson.JSON;
+import com.example.demo.dto.*;
 import com.example.demo.service.IActivitiFlowService;
 import com.example.demo.utils.SnowflakeIdWorker;
 import com.google.common.collect.Lists;
@@ -13,6 +13,9 @@ import org.activiti.bpmn.model.Process;
 import org.activiti.bpmn.model.*;
 import org.activiti.engine.ProcessEngine;
 import org.activiti.engine.ProcessEngines;
+import org.activiti.engine.TaskService;
+import org.activiti.engine.history.HistoricProcessInstance;
+import org.activiti.engine.impl.TaskServiceImpl;
 import org.activiti.engine.repository.Deployment;
 import org.activiti.engine.runtime.ProcessInstance;
 import org.activiti.engine.task.Task;
@@ -81,28 +84,24 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
      * @param processId the process id
      */
     @Override
-    public void activationActiviti(String processId, String orderId) {
+    public void activationActiviti(StartTaskRequestDto startTaskRequestDto) {
+
+
 
         ProcessEngine processEngine = ProcessEngines.getDefaultProcessEngine();
         // 4. 启动一个流程实例
 
         ProcessInstance processInstance =
-            processEngine.getRuntimeService().startProcessInstanceByKeyAndTenantId(processId, orderId, "1234567");
+            processEngine.getRuntimeService().startProcessInstanceByKeyAndTenantId(startTaskRequestDto.getProcessId(), startTaskRequestDto.getOrderId(), startTaskRequestDto.getTenantId());
         logger.info("启动流程");
-        // 5. 获取流程任务
-        List<Task> tasks =
-            processEngine.getTaskService().createTaskQuery().processInstanceId(processInstance.getId()).list();
-
         try {
             //6. 将流程图保存到本地文件
             InputStream processDiagram =
                 processEngine.getRepositoryService().getProcessDiagram(processInstance.getProcessDefinitionId());
-            FileUtils.copyInputStreamToFile(processDiagram, new File("/Users/naughty/Pictures/" + processId + ".png"));
+            FileUtils.copyInputStreamToFile(processDiagram, new File("/Users/naughty/Pictures/" + startTaskRequestDto.getProcessId() + ".png"));
             logger.info("启动流程流程图保存到本地");
-            // 7. 保存BPMN.xml到本地文件
-//                    InputStream processBpmn = processEngine.getRepositoryService().getResourceAsStream(deployment
-//                    .getId(), process.getId()+".bpmn");
-//                    FileUtils.copyInputStreamToFile(processBpmn,new File("/deployments/"+process.getId()+".bpmn"));
+
+
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -111,20 +110,54 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
     /**
      * Query activiti task.
      *
-     * @param processId the process id
-     * @param orderId   the order id
+     * @param queryTaskRequestDto the queryTaskRequestDto
      */
     @Override
-    public List<Task> queryActivitiTask(String processId, String orderId) {
+    public List<PerTask> queryActivitiTask(QueryTaskRequestDto queryTaskRequestDto) {
         ProcessEngine processEngine = ProcessEngines.getDefaultProcessEngine();
         TaskQuery taskQuery = processEngine.getTaskService().createTaskQuery();
-        List<Task> list = taskQuery.processInstanceBusinessKey(orderId).list();
-//        logger.info("获取结果:{}", JSON.toJSONString(list));
-        return list;
+        List<Task> list = taskQuery.taskCandidateUser(queryTaskRequestDto.getUserId()).orderByTaskCreateTime().desc().list();
+        return Optional.ofNullable(list).orElse(Lists.newArrayList()).stream().filter(Objects::nonNull).map(task->{
+            PerTask perTask = new PerTask();
+            perTask.setTaskId(task.getId());
+            perTask.setName(task.getName());
+            perTask.setTime(task.getCreateTime());
+            perTask.setProcessId(task.getProcessInstanceId());
+            ProcessInstance processInstance = processEngine.getRuntimeService().createProcessInstanceQuery().processInstanceId(task.getProcessInstanceId()).singleResult();
+            perTask.setOrderId(processInstance.getBusinessKey());
+            perTask.setTenantId(processInstance.getTenantId());
+            return perTask;
+        }).collect(Collectors.toList());
+    }
+
+    /**
+     * 执行任务.
+     *
+     * @param exeTaskRequestDto
+     */
+    @Override
+    public void exeActivitiTask(ExeTaskRequestDto exeTaskRequestDto) {
+        //根据人,进行任务执行。
+        logger.info("执行任:{}", JSON.toJSONString(exeTaskRequestDto));
+        ProcessEngine processEngine = ProcessEngines.getDefaultProcessEngine();
+        TaskService taskService = processEngine.getTaskService();
+        Map<String,Object> resultMap = Maps.newHashMap();
+        resultMap.put("result",exeTaskRequestDto.getResultCode());
+        resultMap.put("context",exeTaskRequestDto.getContext());
+        taskService.complete(exeTaskRequestDto.getTaskId(),resultMap);
 
     }
 
+    private void stopRunProcessInstance(String taskId,String orderId){
+        if(StringUtils.isNotEmpty(orderId)){
+            ProcessEngine processEngine =ProcessEngines.getDefaultProcessEngine();
+            Task task = processEngine.getTaskService().createTaskQuery().processInstanceBusinessKey(orderId).singleResult();
+            if(!Objects.isNull(task)){
+                TaskServiceImpl taskServiceImpl = (TaskServiceImpl) processEngine.getTaskService();
 
+            }
+        }
+    }
     private String createActivitiProcess(ActivitiFlowRequestDto activitiFlowRequestDto,
                                          List<ActivitiFlowStepDto> stepDtoList) {
         ProcessEngine processEngine = ProcessEngines.getDefaultProcessEngine();
@@ -178,11 +211,10 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
      */
     protected UserTask createUserTask(String id, String name, String userPkno) {
         List<String> candidateUsers = new ArrayList<String>();
-        candidateUsers.add(userPkno);
         UserTask userTask = new UserTask();
         userTask.setName(name);
         userTask.setId(id);
-
+        candidateUsers.add(userPkno);
         userTask.setCandidateUsers(candidateUsers);
         return userTask;
     }
@@ -595,6 +627,10 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
 
     /**
      * 构建普通节点的连线.
+     *
+     * @param process         the process
+     * @param stepMap         the step map
+     * @param totalStepNumber the total step number
      */
     public void buildNormalSequenceFlow(Process process, Map<Integer, List<ActivitiFlowStepDto>> stepMap,
                                         Integer totalStepNumber) {
@@ -635,6 +671,9 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
 
     /**
      * 处理节点的父类节点.
+     *
+     * @param stepDtoList the step dto list
+     * @return the list
      */
     public List<ActivitiFlowStepDto> makeNodeParentType(List<ActivitiFlowStepDto> stepDtoList) {
         //按照步骤顺序进行排序

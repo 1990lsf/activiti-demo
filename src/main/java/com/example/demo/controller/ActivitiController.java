@@ -2,10 +2,13 @@ package com.example.demo.controller;
 
 import com.alibaba.fastjson.JSON;
 import com.example.demo.dto.ActivitiFlowRequestDto;
+import com.example.demo.dto.ExeTaskRequestDto;
+import com.example.demo.dto.QueryTaskRequestDto;
+import com.example.demo.dto.StartTaskRequestDto;
 import com.example.demo.service.IActivitiFlowService;
+import com.example.demo.dto.PerTask;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import org.activiti.engine.task.Task;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,28 +43,38 @@ public class ActivitiController {
     /**
      * 开始流程.
      *
-     * @param processId the process id
-     * @param orderId   the order id
+     * @param startTaskRequestDto the start task request dto
      * @return the response entity
      */
-    @PostMapping(value = "/activiti/{processId}/order/{orderId}")
+    @PostMapping(value = "/activiti/order/start/")
     @ApiOperation(value = "开始流程", notes = "开始流程")
-    public ResponseEntity activationActiviti(
-        @PathVariable("processId")String processId, @PathVariable("orderId") String orderId) {
-        logger.info("开始流程任务:{},业务编号:{}", processId, orderId);
-        iActivitiFlowService.activationActiviti(processId, orderId);
+    public ResponseEntity activationActiviti(@RequestBody StartTaskRequestDto startTaskRequestDto) {
+        logger.info("开始流程任务:{},业务编号:{}", startTaskRequestDto.getProcessId(), startTaskRequestDto.getOrderId());
+        iActivitiFlowService.activationActiviti(startTaskRequestDto);
         return new ResponseEntity(HttpStatus.OK);
     }
 
     /**
      * 获取流程任务.
+     *
+     * @param queryTaskRequestDto the query task request dto
+     * @return the response entity
      */
-    @GetMapping(value = "/activiti/{processId}/order/{orderId}")
-    @ApiOperation(value = "获取流程任务", notes = "开始流程任务")
-    public ResponseEntity<List<Task>> queryActivitiTask(
-        @PathVariable("processId")String processId, @PathVariable("orderId") String orderId) {
-        logger.info("获取流程任务:{},业务编号:{}", processId, orderId);
+    @GetMapping(value = "/activiti/order/task/")
+    @ApiOperation(value = "获取流程任务", notes = "获取流程任务")
+    public ResponseEntity<List<PerTask>> queryActivitiTask(QueryTaskRequestDto queryTaskRequestDto) {
+        logger.info("获取流程任务:{},业务编号:{}", queryTaskRequestDto.getProcessId(), queryTaskRequestDto.getOrderId());
+        return ResponseEntity.ok(iActivitiFlowService.queryActivitiTask(queryTaskRequestDto));
+    }
 
-        return ResponseEntity.ok(iActivitiFlowService.queryActivitiTask(processId, orderId));
+    /**
+     * 执行流程任务.
+     */
+    @PostMapping(value = "/activiti/order/run/task")
+    @ApiOperation(value = "执行任务", notes = "执行任务")
+    public ResponseEntity exeActivitiTask(ExeTaskRequestDto exeTaskRequestDto) {
+        logger.info("执行任务:{},执行人:{}", exeTaskRequestDto.getTaskId(), exeTaskRequestDto.getUserId());
+        iActivitiFlowService.exeActivitiTask(exeTaskRequestDto);
+        return new ResponseEntity(HttpStatus.OK);
     }
 }
