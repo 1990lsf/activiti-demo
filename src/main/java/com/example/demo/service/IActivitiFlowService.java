@@ -1,6 +1,9 @@
 package com.example.demo.service;
 
 import com.example.demo.dto.ActivitiFlowRequestDto;
+import com.example.demo.dto.QueryTaskRequestDto;
+import com.example.demo.dto.StartTaskRequestDto;
+import com.example.demo.service.impl.PerTask;
 import org.activiti.engine.task.Task;
 
 import java.util.List;
@@ -21,16 +24,15 @@ public interface IActivitiFlowService {
      /**
       * 启动流程实例.
       *
-      * @param processId the process id
-      * @param orderId   the order id
+      * @param startTaskRequestDto the start task request dto
       */
-     void activationActiviti(String processId,String orderId);
+     void activationActiviti(StartTaskRequestDto startTaskRequestDto);
 
      /**
       * Query activiti task.
       *
-      * @param processId the process id
-      * @param orderId   the order id
+      * @param queryTaskRequestDto the query task request dto
+      * @return the list
       */
-     List<Task> queryActivitiTask(String processId, String orderId);
+     List<PerTask> queryActivitiTask(QueryTaskRequestDto queryTaskRequestDto);
 }

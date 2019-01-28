@@ -1,8 +1,11 @@
 package com.example.demo.service.impl;
 
 
+import com.alibaba.fastjson.JSON;
 import com.example.demo.dto.ActivitiFlowRequestDto;
 import com.example.demo.dto.ActivitiFlowStepDto;
+import com.example.demo.dto.QueryTaskRequestDto;
+import com.example.demo.dto.StartTaskRequestDto;
 import com.example.demo.service.IActivitiFlowService;
 import com.example.demo.utils.SnowflakeIdWorker;
 import com.google.common.collect.Lists;
@@ -11,6 +14,7 @@ import com.google.common.collect.Maps;
 import org.activiti.bpmn.BpmnAutoLayout;
 import org.activiti.bpmn.model.Process;
 import org.activiti.bpmn.model.*;
+import org.activiti.engine.IdentityService;
 import org.activiti.engine.ProcessEngine;
 import org.activiti.engine.ProcessEngines;
 import org.activiti.engine.repository.Deployment;
@@ -25,6 +29,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -81,28 +86,24 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
      * @param processId the process id
      */
     @Override
-    public void activationActiviti(String processId, String orderId) {
+    public void activationActiviti(StartTaskRequestDto startTaskRequestDto) {
+
+
 
         ProcessEngine processEngine = ProcessEngines.getDefaultProcessEngine();
         // 4. 启动一个流程实例
 
         ProcessInstance processInstance =
-            processEngine.getRuntimeService().startProcessInstanceByKeyAndTenantId(processId, orderId, "1234567");
+            processEngine.getRuntimeService().startProcessInstanceByKeyAndTenantId(startTaskRequestDto.getProcessId(), startTaskRequestDto.getOrderId(), startTaskRequestDto.getTenantId());
         logger.info("启动流程");
-        // 5. 获取流程任务
-        List<Task> tasks =
-            processEngine.getTaskService().createTaskQuery().processInstanceId(processInstance.getId()).list();
-
         try {
             //6. 将流程图保存到本地文件
             InputStream processDiagram =
                 processEngine.getRepositoryService().getProcessDiagram(processInstance.getProcessDefinitionId());
-            FileUtils.copyInputStreamToFile(processDiagram, new File("/Users/naughty/Pictures/" + processId + ".png"));
+            FileUtils.copyInputStreamToFile(processDiagram, new File("/Users/naughty/Pictures/" + startTaskRequestDto.getProcessId() + ".png"));
             logger.info("启动流程流程图保存到本地");
-            // 7. 保存BPMN.xml到本地文件
-//                    InputStream processBpmn = processEngine.getRepositoryService().getResourceAsStream(deployment
-//                    .getId(), process.getId()+".bpmn");
-//                    FileUtils.copyInputStreamToFile(processBpmn,new File("/deployments/"+process.getId()+".bpmn"));
+
+
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -115,13 +116,21 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
      * @param orderId   the order id
      */
     @Override
-    public List<Task> queryActivitiTask(String processId, String orderId) {
+    public List<PerTask> queryActivitiTask(QueryTaskRequestDto queryTaskRequestDto) {
         ProcessEngine processEngine = ProcessEngines.getDefaultProcessEngine();
         TaskQuery taskQuery = processEngine.getTaskService().createTaskQuery();
-        List<Task> list = taskQuery.processInstanceBusinessKey(orderId).list();
-//        logger.info("获取结果:{}", JSON.toJSONString(list));
-        return list;
-
+        List<Task> list = taskQuery.taskCandidateUser(queryTaskRequestDto.getUserId()).orderByTaskCreateTime().desc().list();
+        return Optional.ofNullable(list).orElse(Lists.newArrayList()).stream().filter(Objects::nonNull).map(task->{
+            PerTask perTask = new PerTask();
+            perTask.setTaskId(task.getId());
+            perTask.setName(task.getName());
+            perTask.setTime(task.getCreateTime());
+            perTask.setProcessId(task.getProcessInstanceId());
+            ProcessInstance processInstance = processEngine.getRuntimeService().createProcessInstanceQuery().processInstanceId(task.getProcessInstanceId()).singleResult();
+            perTask.setOrderId(processInstance.getBusinessKey());
+            perTask.setTenantId(processInstance.getTenantId());
+            return perTask;
+        }).collect(Collectors.toList());
     }
 
 
