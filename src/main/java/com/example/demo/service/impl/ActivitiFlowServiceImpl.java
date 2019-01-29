@@ -144,7 +144,8 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
         Map<String, Object> resultMap = Maps.newHashMap();
         resultMap.put("result", exeTaskRequestDto.getResultCode());
         resultMap.put("context", exeTaskRequestDto.getContext());
-        taskService.complete(exeTaskRequestDto.getTaskId(), resultMap);
+        taskService.setVariablesLocal(exeTaskRequestDto.getTaskId(),resultMap);
+        taskService.complete(exeTaskRequestDto.getTaskId());
 
     }
 
@@ -178,7 +179,7 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
                 historyTaskResponseDto.setStartTime(hti.getStartTime());
                 historyTaskResponseDto.setTaskId(hti.getId());
                 List<HistoricDetail> list1 =
-                    historyService.createHistoricDetailQuery().processInstanceId(hti.getProcessInstanceId()).list();
+                    historyService.createHistoricDetailQuery().taskId(hti.getId()).list();
                 historyTaskResponseDto.setContext(JSON.toJSONString(list1));
                 return historyTaskResponseDto;
             })

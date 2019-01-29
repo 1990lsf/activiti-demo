@@ -80,7 +80,7 @@ public class ActivitiController {
     @GetMapping(value = "/activiti/order/history/task")
     @ApiOperation(value = "获取历史任务",notes = "获取历史任务")
     public ResponseEntity<List<HistoryTaskResponseDto>> historyActivitiTask(HistoryTaskRequestDto historyTaskRequestDto){
-        logger.info("获取历史任务:请求参数:{}",historyTaskRequestDto);
+        logger.info("获取历史任务:请求参数:{}",JSON.toJSONString(historyTaskRequestDto));
         return ResponseEntity.ok(iActivitiFlowService.historyActivitiTask(historyTaskRequestDto));
     }
 }
