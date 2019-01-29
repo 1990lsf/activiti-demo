@@ -5,6 +5,7 @@ import io.swagger.annotations.ApiModelProperty;
 
 /**
  * The type Start task request dto.
+ *
  * @author naughty
  */
 @ApiModel("开始流程请求对象")
@@ -13,7 +14,7 @@ public class StartTaskRequestDto {
     @ApiModelProperty("部署ID")
     private String deploymentId;
     @ApiModelProperty("业务ID")
-    private String bussinessId;
+    private String businessId;
     @ApiModelProperty("商户ID")
     private String tenantId;
 
@@ -36,21 +37,21 @@ public class StartTaskRequestDto {
     }
 
     /**
-     * Gets bussiness id.
+     * Gets business id.
      *
-     * @return the bussiness id
+     * @return the business id
      */
-    public String getBussinessId() {
-        return bussinessId;
+    public String getBusinessId() {
+        return businessId;
     }
 
     /**
-     * Sets bussiness id.
+     * Sets business id.
      *
-     * @param bussinessId the bussiness id
+     * @param businessId the business id
      */
-    public void setBussinessId(String bussinessId) {
-        this.bussinessId = bussinessId;
+    public void setBusinessId(String businessId) {
+        this.businessId = businessId;
     }
 
     /**

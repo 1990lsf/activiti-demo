@@ -22,7 +22,6 @@ import org.activiti.engine.runtime.ProcessInstance;
 import org.activiti.engine.task.Task;
 
 
-
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 
@@ -89,8 +88,8 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
         ProcessEngine processEngine = ProcessEngines.getDefaultProcessEngine();
         ProcessInstance processInstance = processEngine.getRuntimeService()
             .startProcessInstanceByKeyAndTenantId(startTaskRequestDto.getDeploymentId(),
-                startTaskRequestDto.getBussinessId(), startTaskRequestDto.getTenantId());
-        logger.info("业务:{},使用部署:{},启动流程", startTaskRequestDto.getBussinessId(), startTaskRequestDto.getDeploymentId());
+                startTaskRequestDto.getBusinessId(), startTaskRequestDto.getTenantId());
+        logger.info("业务:{},使用部署:{},启动流程", startTaskRequestDto.getBusinessId(), startTaskRequestDto.getDeploymentId());
         return processInstance.getProcessInstanceId();
     }
 
@@ -144,7 +143,7 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
         Map<String, Object> resultMap = Maps.newHashMap();
         resultMap.put("result", exeTaskRequestDto.getResultCode());
         resultMap.put("context", exeTaskRequestDto.getContext());
-        taskService.setVariablesLocal(exeTaskRequestDto.getTaskId(),resultMap);
+        taskService.setVariablesLocal(exeTaskRequestDto.getTaskId(), resultMap);
         taskService.complete(exeTaskRequestDto.getTaskId());
 
     }
@@ -216,16 +215,18 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
         new BpmnAutoLayout(model).execute();
 
         //部署流程
-        Deployment deployment =
-            processEngine.getRepositoryService().createDeployment().addBpmnModel(process.getId() + ".bpmn", model).name(process.getId() + "_deployment").tenantId("1234567").deploy();
+        Deployment deployment = processEngine.getRepositoryService()
+            .createDeployment()
+            .addBpmnModel(process.getId() + ".bpmn", model)
+            .name(process.getId() + "_deployment")
+            .tenantId(activitiFlowRequestDto.getTenantId())
+            .deploy();
         try {
             //生成xml
             InputStream processBpmn = processEngine.getRepositoryService().getResourceAsStream(deployment.getId(),
                 process.getId() + ".bpmn");
             FileUtils.copyInputStreamToFile(processBpmn, new File("/Users/naughty/Pictures/" + process.getId() +
                 ".bpmn"));
-            FileUtils.copyInputStreamToFile(processBpmn, new File("/Users/naughty/Pictures/" + process.getId() +
-                ".png"));
         } catch (Exception e) {
             e.printStackTrace();
         }
