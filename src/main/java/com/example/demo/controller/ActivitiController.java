@@ -45,7 +45,7 @@ public class ActivitiController {
     @PostMapping(value = "/activiti/order/start/")
     @ApiOperation(value = "开始流程", notes = "开始流程")
     public ResponseEntity<String> activationActiviti(@RequestBody StartTaskRequestDto startTaskRequestDto) {
-        logger.info("开始流程任务:{},业务编号:{}", startTaskRequestDto.getDeploymentId(), startTaskRequestDto.getBussinessId());
+        logger.info("开始流程任务:{},业务编号:{}", startTaskRequestDto.getDeploymentId(), startTaskRequestDto.getBusinessId());
         return ResponseEntity.ok(iActivitiFlowService.activationActiviti(startTaskRequestDto));
     }
 
