@@ -1,12 +1,8 @@
 package com.example.demo.controller;
 
 import com.alibaba.fastjson.JSON;
-import com.example.demo.dto.ActivitiFlowRequestDto;
-import com.example.demo.dto.ExeTaskRequestDto;
-import com.example.demo.dto.QueryTaskRequestDto;
-import com.example.demo.dto.StartTaskRequestDto;
+import com.example.demo.dto.*;
 import com.example.demo.service.IActivitiFlowService;
-import com.example.demo.dto.PerTask;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.slf4j.Logger;
@@ -48,10 +44,9 @@ public class ActivitiController {
      */
     @PostMapping(value = "/activiti/order/start/")
     @ApiOperation(value = "开始流程", notes = "开始流程")
-    public ResponseEntity activationActiviti(@RequestBody StartTaskRequestDto startTaskRequestDto) {
-        logger.info("开始流程任务:{},业务编号:{}", startTaskRequestDto.getProcessId(), startTaskRequestDto.getOrderId());
-        iActivitiFlowService.activationActiviti(startTaskRequestDto);
-        return new ResponseEntity(HttpStatus.OK);
+    public ResponseEntity<String> activationActiviti(@RequestBody StartTaskRequestDto startTaskRequestDto) {
+        logger.info("开始流程任务:{},业务编号:{}", startTaskRequestDto.getDeploymentId(), startTaskRequestDto.getBussinessId());
+        return ResponseEntity.ok(iActivitiFlowService.activationActiviti(startTaskRequestDto));
     }
 
     /**
@@ -63,7 +58,7 @@ public class ActivitiController {
     @GetMapping(value = "/activiti/order/task/")
     @ApiOperation(value = "获取流程任务", notes = "获取流程任务")
     public ResponseEntity<List<PerTask>> queryActivitiTask(QueryTaskRequestDto queryTaskRequestDto) {
-        logger.info("获取流程任务:{},业务编号:{}", queryTaskRequestDto.getProcessId(), queryTaskRequestDto.getOrderId());
+        logger.info("用户:{},获取流程任务:{}", queryTaskRequestDto.getUserId(),queryTaskRequestDto.getProcessId());
         return ResponseEntity.ok(iActivitiFlowService.queryActivitiTask(queryTaskRequestDto));
     }
 
@@ -76,5 +71,16 @@ public class ActivitiController {
         logger.info("执行任务:{},执行人:{}", exeTaskRequestDto.getTaskId(), exeTaskRequestDto.getUserId());
         iActivitiFlowService.exeActivitiTask(exeTaskRequestDto);
         return new ResponseEntity(HttpStatus.OK);
+    }
+
+
+    /**
+     * 获取历史任务.
+     */
+    @GetMapping(value = "/activiti/order/history/task")
+    @ApiOperation(value = "获取历史任务",notes = "获取历史任务")
+    public ResponseEntity<List<HistoryTaskResponseDto>> historyActivitiTask(HistoryTaskRequestDto historyTaskRequestDto){
+        logger.info("获取历史任务:请求参数:{}",JSON.toJSONString(historyTaskRequestDto));
+        return ResponseEntity.ok(iActivitiFlowService.historyActivitiTask(historyTaskRequestDto));
     }
 }

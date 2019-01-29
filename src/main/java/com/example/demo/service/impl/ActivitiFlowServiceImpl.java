@@ -11,17 +11,18 @@ import com.google.common.collect.Maps;
 import org.activiti.bpmn.BpmnAutoLayout;
 import org.activiti.bpmn.model.Process;
 import org.activiti.bpmn.model.*;
+import org.activiti.engine.HistoryService;
 import org.activiti.engine.ProcessEngine;
 import org.activiti.engine.ProcessEngines;
 import org.activiti.engine.TaskService;
-import org.activiti.engine.history.HistoricProcessInstance;
-import org.activiti.engine.impl.TaskServiceImpl;
+import org.activiti.engine.history.*;
+
 import org.activiti.engine.repository.Deployment;
 import org.activiti.engine.runtime.ProcessInstance;
 import org.activiti.engine.task.Task;
 
 
-import org.activiti.engine.task.TaskQuery;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 
@@ -81,30 +82,16 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
     /**
      * 启动流程实例.
      *
-     * @param processId the process id
+     * @param startTaskRequestDto the startTaskRequestDto
      */
     @Override
-    public void activationActiviti(StartTaskRequestDto startTaskRequestDto) {
-
-
-
+    public String activationActiviti(StartTaskRequestDto startTaskRequestDto) {
         ProcessEngine processEngine = ProcessEngines.getDefaultProcessEngine();
-        // 4. 启动一个流程实例
-
-        ProcessInstance processInstance =
-            processEngine.getRuntimeService().startProcessInstanceByKeyAndTenantId(startTaskRequestDto.getProcessId(), startTaskRequestDto.getOrderId(), startTaskRequestDto.getTenantId());
-        logger.info("启动流程");
-        try {
-            //6. 将流程图保存到本地文件
-            InputStream processDiagram =
-                processEngine.getRepositoryService().getProcessDiagram(processInstance.getProcessDefinitionId());
-            FileUtils.copyInputStreamToFile(processDiagram, new File("/Users/naughty/Pictures/" + startTaskRequestDto.getProcessId() + ".png"));
-            logger.info("启动流程流程图保存到本地");
-
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        ProcessInstance processInstance = processEngine.getRuntimeService()
+            .startProcessInstanceByKeyAndTenantId(startTaskRequestDto.getDeploymentId(),
+                startTaskRequestDto.getBussinessId(), startTaskRequestDto.getTenantId());
+        logger.info("业务:{},使用部署:{},启动流程", startTaskRequestDto.getBussinessId(), startTaskRequestDto.getDeploymentId());
+        return processInstance.getProcessInstanceId();
     }
 
     /**
@@ -115,19 +102,32 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
     @Override
     public List<PerTask> queryActivitiTask(QueryTaskRequestDto queryTaskRequestDto) {
         ProcessEngine processEngine = ProcessEngines.getDefaultProcessEngine();
-        TaskQuery taskQuery = processEngine.getTaskService().createTaskQuery();
-        List<Task> list = taskQuery.taskCandidateUser(queryTaskRequestDto.getUserId()).orderByTaskCreateTime().desc().list();
-        return Optional.ofNullable(list).orElse(Lists.newArrayList()).stream().filter(Objects::nonNull).map(task->{
-            PerTask perTask = new PerTask();
-            perTask.setTaskId(task.getId());
-            perTask.setName(task.getName());
-            perTask.setTime(task.getCreateTime());
-            perTask.setProcessId(task.getProcessInstanceId());
-            ProcessInstance processInstance = processEngine.getRuntimeService().createProcessInstanceQuery().processInstanceId(task.getProcessInstanceId()).singleResult();
-            perTask.setOrderId(processInstance.getBusinessKey());
-            perTask.setTenantId(processInstance.getTenantId());
-            return perTask;
-        }).collect(Collectors.toList());
+        List<Task> list = processEngine.getTaskService()
+            .createTaskQuery()
+            .taskCandidateUser(queryTaskRequestDto.getUserId())
+            .orderByTaskCreateTime()
+            .desc()
+            .list();
+        return Optional.ofNullable(list)
+            .orElse(Lists.newArrayList())
+            .stream()
+            .filter(Objects::nonNull)
+            .filter(task -> queryTaskRequestDto.getProcessId() == null ? true :
+                task.getProcessInstanceId().equals(queryTaskRequestDto.getProcessId()))
+            .map(task -> {
+                PerTask perTask = new PerTask();
+                perTask.setTaskId(task.getId());
+                perTask.setName(task.getName());
+                perTask.setTime(task.getCreateTime());
+                perTask.setProcessId(task.getProcessInstanceId());
+                ProcessInstance processInstance = processEngine.getRuntimeService()
+                    .createProcessInstanceQuery()
+                    .processInstanceId(task.getProcessInstanceId())
+                    .singleResult();
+                perTask.setOrderId(processInstance.getBusinessKey());
+                perTask.setTenantId(processInstance.getTenantId());
+                return perTask;
+            }).collect(Collectors.toList());
     }
 
     /**
@@ -141,23 +141,52 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
         logger.info("执行任:{}", JSON.toJSONString(exeTaskRequestDto));
         ProcessEngine processEngine = ProcessEngines.getDefaultProcessEngine();
         TaskService taskService = processEngine.getTaskService();
-        Map<String,Object> resultMap = Maps.newHashMap();
-        resultMap.put("result",exeTaskRequestDto.getResultCode());
-        resultMap.put("context",exeTaskRequestDto.getContext());
-        taskService.complete(exeTaskRequestDto.getTaskId(),resultMap);
+        Map<String, Object> resultMap = Maps.newHashMap();
+        resultMap.put("result", exeTaskRequestDto.getResultCode());
+        resultMap.put("context", exeTaskRequestDto.getContext());
+        taskService.setVariablesLocal(exeTaskRequestDto.getTaskId(),resultMap);
+        taskService.complete(exeTaskRequestDto.getTaskId());
 
     }
 
-    private void stopRunProcessInstance(String taskId,String orderId){
-        if(StringUtils.isNotEmpty(orderId)){
-            ProcessEngine processEngine =ProcessEngines.getDefaultProcessEngine();
-            Task task = processEngine.getTaskService().createTaskQuery().processInstanceBusinessKey(orderId).singleResult();
-            if(!Objects.isNull(task)){
-                TaskServiceImpl taskServiceImpl = (TaskServiceImpl) processEngine.getTaskService();
-
-            }
+    /**
+     * 查询任务的历史.
+     *
+     * @param historyTaskRequestDto
+     */
+    @Override
+    public List<HistoryTaskResponseDto> historyActivitiTask(HistoryTaskRequestDto historyTaskRequestDto) {
+        ProcessEngine processEngine = ProcessEngines.getDefaultProcessEngine();
+        HistoryService historyService = processEngine.getHistoryService();
+        HistoricTaskInstanceQuery historicTaskInstanceQuery = historyService.createHistoricTaskInstanceQuery();
+        if (StringUtils.isNotEmpty(historyTaskRequestDto.getUserId())) {
+            //传入执行人了.
+            historicTaskInstanceQuery = historicTaskInstanceQuery.taskAssignee(historyTaskRequestDto.getUserId());
         }
+        if (StringUtils.isNotEmpty(historyTaskRequestDto.getProcessId())) {
+            historicTaskInstanceQuery =
+                historicTaskInstanceQuery.processInstanceId(historyTaskRequestDto.getProcessId());
+        }
+        List<HistoricTaskInstance> list =
+            historicTaskInstanceQuery.orderByHistoricTaskInstanceEndTime().desc().list();
+
+        return Optional.ofNullable(list).orElse(Lists.newArrayList()).stream().filter(Objects::nonNull)
+            .map(hti -> {
+                HistoryTaskResponseDto historyTaskResponseDto = new HistoryTaskResponseDto();
+                historyTaskResponseDto.setActivitiName(hti.getName());
+
+                historyTaskResponseDto.setEndTime(hti.getCreateTime());
+                historyTaskResponseDto.setStartTime(hti.getStartTime());
+                historyTaskResponseDto.setTaskId(hti.getId());
+                List<HistoricDetail> list1 =
+                    historyService.createHistoricDetailQuery().taskId(hti.getId()).list();
+                historyTaskResponseDto.setContext(JSON.toJSONString(list1));
+                return historyTaskResponseDto;
+            })
+            .collect(Collectors.toList());
+
     }
+
     private String createActivitiProcess(ActivitiFlowRequestDto activitiFlowRequestDto,
                                          List<ActivitiFlowStepDto> stepDtoList) {
         ProcessEngine processEngine = ProcessEngines.getDefaultProcessEngine();
@@ -195,6 +224,8 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
                 process.getId() + ".bpmn");
             FileUtils.copyInputStreamToFile(processBpmn, new File("/Users/naughty/Pictures/" + process.getId() +
                 ".bpmn"));
+            FileUtils.copyInputStreamToFile(processBpmn, new File("/Users/naughty/Pictures/" + process.getId() +
+                ".png"));
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -337,42 +368,6 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
                 buildNormalNode(process, stepMap);
             }
         });
-
-//        for (int i = 0; i < stepDtos.size(); i++) {
-//            ActivitiFlowStepDto step = stepDtos.get(i);
-//            //判断是否会签
-//            if (NODE_TYPE_SING.equals(step.getNodeType())) {
-//                //会签
-//                //加入并行网关-分支
-//                process.addFlowElement(createParallelGateway("parallelGateway-fork" + i, "并行网关-分支" + i));
-//                //如果是角色类型的
-//                if (NODE_ACTIVITI_TYPE_ROLE.equals(step.getNodeActionType())) {
-//                    //获取角色下所有用户
-//                    List<String> userList = new ArrayList<>();
-//                    for (int u = 0; u < userList.size(); u++) {
-//                        process.addFlowElement(createUserTask("userTask" + i + u + "r", "并行网关分支用户审核节点" + i + u + "r",
-//                            userList.get(u)));
-//                    }
-//                } else {
-//                    process.addFlowElement(createUserTask("userTask" + i + "0u", "并行网关分支用户审核节点" + i + "0u",
-//                        step.getRoleOrUserId()));
-//                }
-//
-//                //并行网关-汇聚
-//                process.addFlowElement(createParallelGateway("parallelGateway-join" + i, "并行网关到-汇聚" + i));
-//
-//            } else {
-//                //普通流转
-//                //审核节点
-//                if (NODE_ACTIVITI_TYPE_ROLE.equals(step.getNodeActionType())) {
-//                    process.addFlowElement(createGroupTask("task" + i, "组审核节点" + i, step.getRoleOrUserId()));
-//                } else {
-//                    process.addFlowElement(createUserTask("task" + i, "组审核节点" + i, step.getRoleOrUserId()));
-//                }
-//                //回退节点
-//                process.addFlowElement(createUserTask("repulse" + i, "回退节点" + i, "${startUserId}"));
-//            }
-//        }
     }
 
     /**
@@ -398,85 +393,6 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
                 buildNormalSequenceFlow(process, entry.getValue(), max);
             }
         });
-
-
-//        for (int y = 0; y < stepList.size(); y++) {
-//            ActivitiFlowStepDto step = stepList.get(y);
-//            //是否会签
-//            if (NODE_TYPE_SING.equals(step.getNodeType())) {
-//                //会签
-//                //判断是否第一个节点
-//                if (y == 0) {
-//                    //开始节点和并行网关-分支连线
-//                    process.addFlowElement(createSequenceFlow("startEvent", "parallelGateway-fork" + y,
-//                        "开始节点到并行网关-分支" + y, ""));
-//                } else {
-//                    //审核节点或者并行网关-汇聚到并行网关-分支
-//                    //判断上一个节点是否是会签
-//                    if (NODE_TYPE_SING.equals(stepList.get(y - 1).getNodeType())) {
-//                        process.addFlowElement(createSequenceFlow("parallelGateway-join" + (y - 1),
-//                        "parallelGateway" +
-//                            "-fork" + y, "并行网关-汇聚到并行网关-分支" + y, ""));
-//                    } else {
-//                        process.addFlowElement(createSequenceFlow("task" + (y - 1), "parallelGateway-fork" + y,
-//                            "上一个审核节点到并行网关-分支" + y, ""));
-//                    }
-//                }
-//                //并行网关-分支和会签用户连线，会签用户和并行网关-汇聚连线
-//                if (NODE_ACTIVITI_TYPE_ROLE.equals(step.getNodeActionType())) {
-//                    List<String> userList = new ArrayList<>();
-//                    for (int u = 0; u < userList.size(); u++) {
-//                        process.addFlowElement(createSequenceFlow("parallelGateway-fork" + y, "userTask" + y + u +
-//                        "r",
-//                            "并行网关-分支到会签用户" + y + u + "r", ""));
-//                        process.addFlowElement(createSequenceFlow("userTask" + y + u + "r", "parallelGateway-join"
-//                        + y,
-//                            "会签用户到并行网关-汇聚", ""));
-//                    }
-//                } else {
-//                    process.addFlowElement(createSequenceFlow("parallelGateway-fork" + y, "userTask" + y + "0u",
-//                        "并行网关-分支到会签用户" + y + "0u", ""));
-//                    process.addFlowElement(createSequenceFlow("userTask" + y + "0u", "parallelGateway-join" + y,
-//                        "会签用户到并行网关-汇聚", ""));
-//                }
-//
-//                //最后一个节点  并行网关-汇聚到结束节点
-//                if (y == (stepList.size() - 1)) {
-//                    process.addFlowElement(createSequenceFlow("parallelGateway-join" + y, "endEvent", "并行网关-汇聚到结束节点",
-//                        ""));
-//                }
-//            } else {
-//                //普通流转
-//                //第一个节点
-//                if (y == 0) {
-//                    //开始节点和审核节点1
-//                    process.addFlowElement(createSequenceFlow("startEvent", "task" + y, "开始节点到审核节点" + y, ""));
-//                } else {
-//                    //判断上一个节点是否会签
-//                    if (NODE_TYPE_SING.equals(step.getNodeType())) {
-//                        //会签
-//                        //并行网关-汇聚到审核节点
-//                        process.addFlowElement(createSequenceFlow("parallelGateway-join" + (y - 1), "task" + y,
-//                            "并行网关-汇聚到审核节点" + y, ""));
-//                    } else {
-//                        //普通
-//                        process.addFlowElement(createSequenceFlow("task" + (y - 1), "task" + y, "审核节点" + (y - 1) +
-//                            "到审核节点" + y, "${flag=='true'}"));
-//                    }
-//                }
-//                //是否最后一个节点
-//                if (y == (stepList.size() - 1)) {
-//                    //审核节点到结束节点
-//                    process.addFlowElement(createSequenceFlow("task" + y, "endEvent", "审核节点" + y + "到结束节点", "${flag" +
-//                        "=='true'}"));
-//                }
-//                //审核节点到回退节点
-//                process.addFlowElement(createSequenceFlow("task" + y, "repulse" + y, "审核不通过-打回" + y,
-//                "${flag=='false" +
-//                    "'}"));
-//                process.addFlowElement(createSequenceFlow("repulse" + y, "task" + y, "回退节点到审核节点" + y, ""));
-//            }
-//        }
     }
 
     /**
@@ -529,7 +445,7 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
      * @param process the process
      * @param stepMap the step map
      */
-    public void buildNormalNode(Process process, Map<Integer, List<ActivitiFlowStepDto>> stepMap) {
+    private void buildNormalNode(Process process, Map<Integer, List<ActivitiFlowStepDto>> stepMap) {
         Optional.ofNullable(stepMap).orElse(Maps.newConcurrentMap())
             .entrySet().forEach(entry -> {
             Integer stepNumber = entry.getKey();
@@ -632,8 +548,8 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
      * @param stepMap         the step map
      * @param totalStepNumber the total step number
      */
-    public void buildNormalSequenceFlow(Process process, Map<Integer, List<ActivitiFlowStepDto>> stepMap,
-                                        Integer totalStepNumber) {
+    private void buildNormalSequenceFlow(Process process, Map<Integer, List<ActivitiFlowStepDto>> stepMap,
+                                         Integer totalStepNumber) {
         Optional.ofNullable(stepMap).orElse(Maps.newConcurrentMap()).entrySet().forEach(entry -> {
             Integer stepNumber = entry.getKey();
             List<ActivitiFlowStepDto> stepDtoList = entry.getValue();
@@ -675,11 +591,11 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
      * @param stepDtoList the step dto list
      * @return the list
      */
-    public List<ActivitiFlowStepDto> makeNodeParentType(List<ActivitiFlowStepDto> stepDtoList) {
+    private List<ActivitiFlowStepDto> makeNodeParentType(List<ActivitiFlowStepDto> stepDtoList) {
         //按照步骤顺序进行排序
         List<ActivitiFlowStepDto> orderStepDtoList =
             Optional.ofNullable(stepDtoList).orElse(Lists.newArrayList()).stream().filter(Objects::nonNull)
-            .sorted(Comparator.comparing(ActivitiFlowStepDto::getSerialNumber)).collect(Collectors.toList());
+                .sorted(Comparator.comparing(ActivitiFlowStepDto::getSerialNumber)).collect(Collectors.toList());
         for (int i = 1, j = orderStepDtoList.size(); i < j; i++) {
             ActivitiFlowStepDto activitiFlowStepDto = orderStepDtoList.get(i);
             ActivitiFlowStepDto parentActivitiFlowStepDto = orderStepDtoList.get(i - 1);
@@ -687,4 +603,6 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
         }
         return orderStepDtoList;
     }
+
+
 }
