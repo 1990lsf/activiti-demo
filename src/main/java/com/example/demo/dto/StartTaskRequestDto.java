@@ -1,36 +1,73 @@
 package com.example.demo.dto;
 
-public class StartTaskRequestDto {
-    //部署ID
-    private String processId;
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
 
-    //业务ID
-    private String orderId;
-    //商户ID
+/**
+ * The type Start task request dto.
+ * @author naughty
+ */
+@ApiModel("开始流程请求对象")
+public class StartTaskRequestDto {
+
+    @ApiModelProperty("部署ID")
+    private String deploymentId;
+    @ApiModelProperty("业务ID")
+    private String bussinessId;
+    @ApiModelProperty("商户ID")
     private String tenantId;
 
+    /**
+     * Gets tenant id.
+     *
+     * @return the tenant id
+     */
     public String getTenantId() {
         return tenantId;
     }
 
+    /**
+     * Sets tenant id.
+     *
+     * @param tenantId the tenant id
+     */
     public void setTenantId(String tenantId) {
         this.tenantId = tenantId;
     }
 
-    public String getOrderId() {
-        return orderId;
+    /**
+     * Gets bussiness id.
+     *
+     * @return the bussiness id
+     */
+    public String getBussinessId() {
+        return bussinessId;
     }
 
-    public void setOrderId(String orderId) {
-        this.orderId = orderId;
+    /**
+     * Sets bussiness id.
+     *
+     * @param bussinessId the bussiness id
+     */
+    public void setBussinessId(String bussinessId) {
+        this.bussinessId = bussinessId;
     }
 
-    public String getProcessId() {
-        return processId;
+    /**
+     * Gets deployment id.
+     *
+     * @return the deployment id
+     */
+    public String getDeploymentId() {
+        return deploymentId;
     }
 
-    public void setProcessId(String processId) {
-        this.processId = processId;
+    /**
+     * Sets deployment id.
+     *
+     * @param deploymentId the deployment id
+     */
+    public void setDeploymentId(String deploymentId) {
+        this.deploymentId = deploymentId;
     }
-
 }
