@@ -7,7 +7,7 @@ public class ExeTaskRequestDto {
     private String processId;
     //用户ID
     private String userId;
-    //结果CODE
+    //结果CODE 1.同意，0.否决
     private String resultCode;
     //内容
     private String context;
