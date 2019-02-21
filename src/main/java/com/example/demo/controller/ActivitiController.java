@@ -3,8 +3,10 @@ package com.example.demo.controller;
 import com.alibaba.fastjson.JSON;
 import com.example.demo.dto.*;
 import com.example.demo.service.IActivitiFlowService;
+
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -58,12 +60,15 @@ public class ActivitiController {
     @GetMapping(value = "/activiti/order/task/")
     @ApiOperation(value = "获取流程任务", notes = "获取流程任务")
     public ResponseEntity<List<PerTask>> queryActivitiTask(QueryTaskRequestDto queryTaskRequestDto) {
-        logger.info("用户:{},获取流程任务:{}", queryTaskRequestDto.getUserId(),queryTaskRequestDto.getProcessId());
+        logger.info("用户:{},获取流程任务:{}", queryTaskRequestDto.getUserId(), queryTaskRequestDto.getProcessId());
         return ResponseEntity.ok(iActivitiFlowService.queryActivitiTask(queryTaskRequestDto));
     }
 
     /**
      * 执行流程任务.
+     *
+     * @param exeTaskRequestDto the exe task request dto
+     * @return the response entity
      */
     @PostMapping(value = "/activiti/order/run/task")
     @ApiOperation(value = "执行任务", notes = "执行任务")
@@ -76,11 +81,15 @@ public class ActivitiController {
 
     /**
      * 获取历史任务.
+     *
+     * @param historyTaskRequestDto the history task request dto
+     * @return the response entity
      */
     @GetMapping(value = "/activiti/order/history/task")
-    @ApiOperation(value = "获取历史任务",notes = "获取历史任务")
-    public ResponseEntity<List<HistoryTaskResponseDto>> historyActivitiTask(HistoryTaskRequestDto historyTaskRequestDto){
-        logger.info("获取历史任务:请求参数:{}",JSON.toJSONString(historyTaskRequestDto));
+    @ApiOperation(value = "获取历史任务", notes = "获取历史任务")
+    public ResponseEntity<List<HistoryTaskResponseDto>> historyActivitiTask(HistoryTaskRequestDto historyTaskRequestDto) {
+        logger.info("获取历史任务:请求参数:{}", JSON.toJSONString(historyTaskRequestDto));
         return ResponseEntity.ok(iActivitiFlowService.historyActivitiTask(historyTaskRequestDto));
     }
+
 }
