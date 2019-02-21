@@ -12,6 +12,7 @@ import org.activiti.bpmn.BpmnAutoLayout;
 import org.activiti.bpmn.model.Process;
 import org.activiti.bpmn.model.*;
 import org.activiti.engine.*;
+
 import org.activiti.engine.history.*;
 
 
@@ -27,6 +28,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,7 +62,6 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
      */
     private static final String NODE_ACTIVITI_TYPE_ROLE = "2";
 
-
     private static final SnowflakeIdWorker snowflakeIdWorker = new SnowflakeIdWorker(0, 0);
 
 
@@ -74,7 +75,10 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
     public String createActivitiFlow(ActivitiFlowRequestDto activitiFlowRequestDto) {
         List<ActivitiFlowStepDto> activitiFlowStepDtos = activitiFlowRequestDto.getStepDtoList();
         List<ActivitiFlowStepDto> sortStepList =
-            Optional.ofNullable(activitiFlowStepDtos).orElse(Lists.newArrayList()).stream().filter(Objects::nonNull)
+            Optional.ofNullable(activitiFlowStepDtos)
+                .orElse(Lists.newArrayList())
+                .stream()
+                .filter(Objects::nonNull)
                 .sorted(Comparator.comparing(ActivitiFlowStepDto::getSerialNumber))
                 .collect(Collectors.toList());
         return createActivitiProcess(activitiFlowRequestDto, sortStepList);
@@ -105,7 +109,7 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
         ProcessEngine processEngine = ProcessEngines.getDefaultProcessEngine();
         List<Task> list = processEngine.getTaskService()
             .createTaskQuery()
-            .taskCandidateUser(queryTaskRequestDto.getUserId())
+            .taskAssignee(queryTaskRequestDto.getUserId())
             .orderByTaskCreateTime()
             .desc()
             .list();
@@ -149,9 +153,8 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
         resultMap.put("resultCode", exeTaskRequestDto.getResultCode());
         resultMap.put("context", exeTaskRequestDto.getContext());
         taskService.setVariablesLocal(exeTaskRequestDto.getTaskId(), resultMap);
+        taskService.setAssignee(exeTaskRequestDto.getTaskId(),exeTaskRequestDto.getUserId());
         taskService.complete(exeTaskRequestDto.getTaskId(), resultMap);
-
-
     }
 
     /**
@@ -162,6 +165,7 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
     @Override
     public List<HistoryTaskResponseDto> historyActivitiTask(HistoryTaskRequestDto historyTaskRequestDto) {
         ProcessEngine processEngine = ProcessEngines.getDefaultProcessEngine();
+
         HistoryService historyService = processEngine.getHistoryService();
         HistoricTaskInstanceQuery historicTaskInstanceQuery = historyService.createHistoricTaskInstanceQuery();
         if (StringUtils.isNotEmpty(historyTaskRequestDto.getUserId())) {
@@ -175,11 +179,12 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
         List<HistoricTaskInstance> list =
             historicTaskInstanceQuery.orderByHistoricTaskInstanceEndTime().desc().list();
 
+
         return Optional.ofNullable(list).orElse(Lists.newArrayList()).stream().filter(Objects::nonNull)
             .map(hti -> {
                 HistoryTaskResponseDto historyTaskResponseDto = new HistoryTaskResponseDto();
                 historyTaskResponseDto.setActivitiName(hti.getName());
-
+                historyTaskResponseDto.setUserId(hti.getAssignee());
                 historyTaskResponseDto.setEndTime(hti.getCreateTime());
                 historyTaskResponseDto.setStartTime(hti.getStartTime());
                 historyTaskResponseDto.setTaskId(hti.getId());
@@ -211,6 +216,7 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
         process.setId("P" + String.valueOf(snowflakeIdWorker.nextId()));
         process.setName(activitiFlowRequestDto.getActivitiName());
         process.setDocumentation(activitiFlowRequestDto.getActivitiDesc());
+
         //获取总的步数
         Integer max =
             Optional.ofNullable(stepDtoList)
@@ -262,12 +268,15 @@ public class ActivitiFlowServiceImpl implements IActivitiFlowService {
      * @return the user task
      */
     protected UserTask createUserTask(String id, String name, String userPkno) {
-        List<String> candidateUsers = new ArrayList<String>();
         UserTask userTask = new UserTask();
         userTask.setName(name);
         userTask.setId(id);
-        candidateUsers.add(userPkno);
-        userTask.setCandidateUsers(candidateUsers);
+        //候补组的方式
+//        List<String> candidateUsers = new ArrayList<String>();
+//        candidateUsers.add(userPkno);
+//        userTask.setCandidateUsers(candidateUsers);
+        //具体处理人的方式
+        userTask.setAssignee(userPkno);
         return userTask;
     }
 
