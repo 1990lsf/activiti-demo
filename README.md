@@ -1,4 +1,6 @@
 # activiti-demo
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2F1990lsf%2Factiviti-demo.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2F1990lsf%2Factiviti-demo?ref=badge_shield)
+
 审批流程小样
 ## 实现功能
 1. 普通审批
@@ -12,3 +14,7 @@
 4. 流程节点时时走向
 5. 审批人改派
 
+
+
+## License
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2F1990lsf%2Factiviti-demo.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2F1990lsf%2Factiviti-demo?ref=badge_large)
