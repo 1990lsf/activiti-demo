@@ -16,5 +16,12 @@
 
 
 
+
 ## License
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2F1990lsf%2Factiviti-demo.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2F1990lsf%2Factiviti-demo?ref=badge_large)
+
+## 备注
+因为一直忙于工作，所以上传后就没怎么维护，如果需要沟通交流可以加我微信或者发邮件
+微信号:lsf19900409 （备注：activit-demo)
+email:shaofengliu1990@gmail.com
+
